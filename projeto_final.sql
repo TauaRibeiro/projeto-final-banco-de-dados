@@ -2,6 +2,65 @@ CREATE DATABASE projeto_final;
 USE projeto_final;
 
 /*
+FUNÇÕES
+*/
+-- Encontrar última data de alteração do preco de um produto
+DELIMITER //
+CREATE FUNCTION encontrar_ultima_alteracao(`id_produto` INT)
+RETURNS DATE NOT DETERMINISTIC
+BEGIN
+	DECLARE `resultado` DATE DEFAULT NULL;
+    
+    SELECT MAX(`pp`.`data_aplicacao`) INTO `resultado`
+    FROM `preco_produto` AS `pp`
+    WHERE `id_produto` = `pp`.`id_produto`;
+    
+    RETURN `resultado`;
+END//
+DELIMITER;
+
+-- Achar o preco mais atualizado de um produto
+DELIMITER //
+CREATE FUNCTION achar_preco(`id_produto` INT)
+RETURNS INT NOT DETERMINISTIC
+BEGIN
+	DECLARE `resultado` INT DEFAULT NULL;
+    
+    SELECT `pp`.`id_produto` INTO `resultado`
+	FROM `preco_produto` AS `pp`
+    WHERE 
+    `pp`.`id_produto` = `id_produto` AND
+    `pp`.`data_aplicacao` = encontrar_ultima_alteracao(`id_produto`);
+    
+    RETURN `resultado`;
+END// 
+DELIMITER ;
+
+-- Calcular sub total da compra
+DELIMITER //
+CREATE FUNCTION calcular_subTotal(`id_preco_produto` INT, `quantidade` INT)
+RETURNS DECIMAL(10, 2) DETERMINISTIC
+BEGIN
+	DECLARE `resultado` DECIMAL(10, 2);
+    
+    SELECT (`pp`.`preco_produto`*`quantidade`) INTO `resultado`
+    FROM `preco_produto` AS `pp`
+    WHERE `id_preco_produto` = `pp`.`id_preco_produto`;
+    
+    RETURN `resultado`;
+END //
+DELIMITER ;
+
+
+/*
+TRIGERS
+*/
+
+/*
+PROCEDURES
+*/
+
+/*
 TABLES
 */
 CREATE TABLE `categoria` (
@@ -93,16 +152,19 @@ CREATE TABLE `interacao_cliente` (
 
 
 CREATE TABLE `item_compra` (
-  `id_item` int NOT NULL,
-  `id_compra` int NOT NULL,
-  `id_preco_produto` int NOT NULL,
-  `quantidade_item` int NOT NULL,
+  `id_item` int(11) NOT NULL,
+  `id_compra` int(11) NOT NULL,
+  `id_preco_produto` int(11) NOT NULL,
+  `quantidade_item` int(11) NOT NULL,
   `sub_total` decimal(10,2) NOT NULL,
+  `id_produto` int(11) NOT NULL,
   PRIMARY KEY (`id_item`),
   KEY `fk_compra_item_idx` (`id_compra`),
   KEY `fk_precoProduto_item_idx` (`id_preco_produto`),
-  CONSTRAINT `fk_compra_item` FOREIGN KEY (`id_compra`) REFERENCES `compra` (`id_compra`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_precoProduto_item` FOREIGN KEY (`id_preco_produto`) REFERENCES `preco_produto` (`id_preco_produto`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  KEY `fk_produto_itemCompra` (`id_produto`),
+  CONSTRAINT `fk_compra_item` FOREIGN KEY (`id_compra`) REFERENCES `compra` (`id_compra`),
+  CONSTRAINT `fk_precoProduto_item` FOREIGN KEY (`id_preco_produto`) REFERENCES `preco_produto` (`id_preco_produto`),
+  CONSTRAINT `fk_produto_itemCompra` FOREIGN KEY (`id_produto`) REFERENCES `preco_produto` (`id_produto`)
 );
 
 
@@ -184,6 +246,11 @@ VIEWS
 ALTER TABLES
 */
 
+ALTER TABLE `item_compra`
+	ADD COLUMN `id_produto` INT NOT NULL,
+    ADD CONSTRAINT `fk_produto_itemCompra` FOREIGN KEY (`id_produto`) REFERENCES `preco_produto`(`id_produto`)
+		ON DELETE RESTRICT
+        ON UPDATE RESTRICT;
 /*
 UPDATES
 */
@@ -196,11 +263,6 @@ INSERTS
 
 /*
 DELETES
-*/
-
-
-/*
-FUNÇÕES
 */
 
 
