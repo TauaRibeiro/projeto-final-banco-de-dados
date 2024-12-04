@@ -64,14 +64,14 @@ PROCEDURES
 TABLES
 */
 CREATE TABLE `categoria` (
-  `id_categoria` int NOT NULL,
+  `id_categoria` int AUTO_INCREMENT NOT NULL,
   `nome_categoria` varchar(50) NOT NULL,
   PRIMARY KEY (`id_categoria`)
 );
 
 
 CREATE TABLE `cliente` (
-  `id_cliente` int NOT NULL,
+  `id_cliente` int AUTO_INCREMENT NOT NULL,
   `nome_cliente` varchar(150) NOT NULL,
   `cpf_cliente` varchar(11) NOT NULL,
   `id_endereco` int NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE `cliente` (
 
 
 CREATE TABLE `compra` (
-  `id_compra` int NOT NULL,
+  `id_compra` int AUTO_INCREMENT NOT NULL,
   `id_cliente` int NOT NULL,
   `total_compra` decimal(10,0) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id_compra`),
@@ -96,7 +96,7 @@ CREATE TABLE `compra` (
 
 
 CREATE TABLE `endereco` (
-  `id_endereco` int NOT NULL,
+  `id_endereco` int AUTO_INCREMENT NOT NULL,
   `cep_endereco` varchar(8) NOT NULL,
   `rua_endereco` varchar(150) NOT NULL,
   `logradouro_endereco` varchar(150) NOT NULL,
@@ -105,28 +105,8 @@ CREATE TABLE `endereco` (
 );
 
 
-CREATE TABLE `entrega` (
-  `id_entrega` int NOT NULL,
-  `id_item` int NOT NULL,
-  `id_status` int NOT NULL,
-  `id_endereco` int NOT NULL,
-  `data_saida` date NOT NULL,
-  `data_chegada` date DEFAULT NULL,
-  `id_transportadora` int NOT NULL,
-  PRIMARY KEY (`id_entrega`),
-  KEY `fk_status_entrega_idx` (`id_status`),
-  KEY `fk_item_entrega_idx` (`id_item`),
-  KEY `fk_endereco_entrega_idx` (`id_endereco`),
-  KEY `fk_transportadora_entrega_idx` (`id_transportadora`),
-  CONSTRAINT `fk_endereco_entrega` FOREIGN KEY (`id_endereco`) REFERENCES `endereco` (`id_endereco`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_item_entrega` FOREIGN KEY (`id_item`) REFERENCES `item_compra` (`id_item`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_status_entrega` FOREIGN KEY (`id_status`) REFERENCES `status` (`id_status`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_transportadora_entrega` FOREIGN KEY (`id_transportadora`) REFERENCES `transportadora` (`id_transportadora`) ON DELETE RESTRICT ON UPDATE RESTRICT
-);
-
-
 CREATE TABLE `funcionario` (
-  `id_funcionario` int NOT NULL,
+  `id_funcionario` int AUTO_INCREMENT NOT NULL,
   `nome_funcionario` varchar(150) NOT NULL,
   `cpf_funcionario` varchar(11) NOT NULL,
   `salario_funcionario` decimal(10,2) NOT NULL,
@@ -138,7 +118,7 @@ CREATE TABLE `funcionario` (
 
 
 CREATE TABLE `interacao_cliente` (
-  `id_interacao` int NOT NULL,
+  `id_interacao` int AUTO_INCREMENT NOT NULL,
   `id_funcionario` int NOT NULL,
   `id_cliente` int NOT NULL,
   `transcricao_interacao` text NOT NULL,
@@ -152,7 +132,7 @@ CREATE TABLE `interacao_cliente` (
 
 
 CREATE TABLE `item_compra` (
-  `id_item` int(11) NOT NULL,
+  `id_item` int(11) AUTO_INCREMENT NOT NULL,
   `id_compra` int(11) NOT NULL,
   `id_preco_produto` int(11) NOT NULL,
   `quantidade_item` int(11) NOT NULL,
@@ -169,7 +149,7 @@ CREATE TABLE `item_compra` (
 
 
 CREATE TABLE `preco_produto` (
-  `id_preco_produto` int NOT NULL,
+  `id_preco_produto` int AUTO_INCREMENT NOT NULL,
   `id_produto` int NOT NULL,
   `preco_produto` decimal(10,2) NOT NULL,
   `data_aplicacao` date NOT NULL,
@@ -180,7 +160,7 @@ CREATE TABLE `preco_produto` (
 
 
 CREATE TABLE `produto` (
-  `id_produto` int NOT NULL,
+  `id_produto` int AUTO_INCREMENT NOT NULL,
   `nome_produto` varchar(150) NOT NULL,
   `quantidade_produto` int NOT NULL,
   `id_categoria` int NOT NULL,
@@ -204,14 +184,14 @@ CREATE TABLE `segmentacao_cliente` (
 
 
 CREATE TABLE `status` (
-  `id_status` int NOT NULL,
+  `id_status` int AUTO_INCREMENT NOT NULL,
   `nome_status` varchar(50) NOT NULL,
   PRIMARY KEY (`id_status`)
 );
 
 
 CREATE TABLE `tarefa` (
-  `id_tarefa` int NOT NULL,
+  `id_tarefa` int AUTO_INCREMENT NOT NULL,
   `id_funcionario` int NOT NULL,
   `nome_tarefa` varchar(150) NOT NULL,
   `descricao_tarefa` varchar(300) NOT NULL,
@@ -226,10 +206,20 @@ CREATE TABLE `tarefa` (
 );
 
 
-CREATE TABLE `transportadora` (
-  `id_transportadora` int NOT NULL,
-  `nome_transportadora` varchar(150) NOT NULL,
-  PRIMARY KEY (`id_transportadora`)
+CREATE TABLE `historico` (
+	`id_historico` INT AUTO_INCREMENT NOT NULL,
+    `tipo_acao` VARCHAR(50) NOT NULL,
+    `id_compra` INT NOT NULL,
+    `id_item` INT,
+    `data_registro` DATETIME NOT NULL,
+    
+    PRIMARY KEY(`id_historico`),
+    CONSTRAINT `fk_compra_historico` FOREIGN KEY(`id_compra`) REFERENCES `compra`(`id_compra`)
+		ON DELETE RESTRICT
+        ON UPDATE RESTRICT,
+	CONSTRAINT `fk_item_historico` FOREIGN KEY(`id_item`) REFERENCES `item_compra`(`id_item`)
+		ON DELETE RESTRICT
+        ON UPDATE RESTRICT
 );
 
 /*
