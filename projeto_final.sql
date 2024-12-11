@@ -55,7 +55,21 @@ DELIMITER ;
 /*
 TRIGERS
 */
-
+DELIMITER //
+ CREATE TRIGGER tr_insert_item_compra
+ AFTER INSERT
+ ON `item_compra` FOR EACH ROW
+ BEGIN
+	 SET @total_antigo = (SELECT `total_compra` FROM `compra` WHERE NEW.`id_compra` = `compra`.`id_compra`); 
+     
+     UPDATE `compra`
+     SET
+     `total_compra` = @total_antigo + achar_preco(NEW.`id_produto`);
+     
+     INSERT INTO `historico`(`tipo_acao`, `id_compra`, `id_item`, `data_registro`)
+     VALUE ("ADIÇÃO DE ITEM", NEW.`id_compra`, NEW.`id_item`, NOW());
+ END//
+DELIMITER ;
 /*
 PROCEDURES
 */
@@ -67,6 +81,14 @@ CREATE TABLE `categoria` (
   `id_categoria` int AUTO_INCREMENT NOT NULL,
   `nome_categoria` varchar(50) NOT NULL,
   PRIMARY KEY (`id_categoria`)
+);
+
+
+CREATE TABLE `tipo_interacao`(
+	`id_tipo` INT AUTO_INCREMENT NOT NULL,
+    `nome_tipo` VARCHAR(50) NOT NULL,
+    
+    PRIMARY KEY(`id_tipo`)
 );
 
 
@@ -118,16 +140,19 @@ CREATE TABLE `funcionario` (
 
 
 CREATE TABLE `interacao_cliente` (
-  `id_interacao` int AUTO_INCREMENT NOT NULL,
-  `id_funcionario` int NOT NULL,
-  `id_cliente` int NOT NULL,
+  `id_interacao` int(11) NOT NULL AUTO_INCREMENT,
+  `id_funcionario` int(11) NOT NULL,
+  `id_cliente` int(11) NOT NULL,
   `transcricao_interacao` text NOT NULL,
   `data_interacao` date NOT NULL,
+  `id_tipo` int(11) NOT NULL,
   PRIMARY KEY (`id_interacao`),
   KEY `fk_funcionario_interacao_idx` (`id_funcionario`),
   KEY `fk_cliente_interacao_idx` (`id_cliente`),
-  CONSTRAINT `fk_cliente_interacao` FOREIGN KEY (`id_cliente`) REFERENCES `cliente` (`id_cliente`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_funcionario_interacao` FOREIGN KEY (`id_funcionario`) REFERENCES `funcionario` (`id_funcionario`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  KEY `id_tipo` (`id_tipo`),
+  CONSTRAINT `fk_cliente_interacao` FOREIGN KEY (`id_cliente`) REFERENCES `cliente` (`id_cliente`),
+  CONSTRAINT `fk_funcionario_interacao` FOREIGN KEY (`id_funcionario`) REFERENCES `funcionario` (`id_funcionario`),
+  CONSTRAINT `interacao_cliente_ibfk_1` FOREIGN KEY (`id_tipo`) REFERENCES `tipo_interacao` (`id_tipo`)
 );
 
 
@@ -160,16 +185,17 @@ CREATE TABLE `preco_produto` (
 
 
 CREATE TABLE `produto` (
-  `id_produto` int AUTO_INCREMENT NOT NULL,
+  `id_produto` int(11) NOT NULL AUTO_INCREMENT,
   `nome_produto` varchar(150) NOT NULL,
-  `quantidade_produto` int NOT NULL,
-  `id_categoria` int NOT NULL,
-  `id_status` int NOT NULL,
+  `estoque_produto` int(11) NOT NULL,
+  `id_categoria` int(11) NOT NULL,
+  `id_status` int(11) NOT NULL,
+  `estoque_minimo_produto` int(11) NOT NULL,
   PRIMARY KEY (`id_produto`),
   KEY `fk_categoria_produto_idx` (`id_categoria`),
   KEY `fk_status_produto_idx` (`id_status`),
-  CONSTRAINT `fk_categoria_produto` FOREIGN KEY (`id_categoria`) REFERENCES `categoria` (`id_categoria`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `fk_status_produto` FOREIGN KEY (`id_status`) REFERENCES `status` (`id_status`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT `fk_categoria_produto` FOREIGN KEY (`id_categoria`) REFERENCES `categoria` (`id_categoria`),
+  CONSTRAINT `fk_status_produto` FOREIGN KEY (`id_status`) REFERENCES `status` (`id_status`)
 );
 
 
@@ -225,6 +251,33 @@ CREATE TABLE `historico` (
 /*
 SELECTS
 */
+SELECT * FROM `projeto_final`.`categoria`;
+
+SELECT * FROM `projeto_final`.`cliente`;
+
+SELECT * FROM `projeto_final`.`compra`;
+
+SELECT * FROM `projeto_final`.`endereco`;
+
+SELECT * FROM `projeto_final`.`funcionario`;
+
+SELECT * FROM `projeto_final`.`historico`;
+
+SELECT * FROM `projeto_final`.`interacao_cliente`;
+
+SELECT * FROM `projeto_final`.`item_compra`;
+
+SELECT * FROM `projeto_final`.`preco_produto`;
+
+SELECT * FROM `projeto_final`.`produto`;
+
+SELECT * FROM `projeto_final`.`segmentacao_cliente`;
+
+SELECT * FROM `projeto_final`.`status`;
+
+SELECT * FROM `projeto_final`.`tarefa`;
+
+SELECT * FROM `projeto_final`.`tipo_interacao`;
 
 
 /*
@@ -241,6 +294,17 @@ ALTER TABLE `item_compra`
     ADD CONSTRAINT `fk_produto_itemCompra` FOREIGN KEY (`id_produto`) REFERENCES `preco_produto`(`id_produto`)
 		ON DELETE RESTRICT
         ON UPDATE RESTRICT;
+        
+ALTER TABLE `interacao_cliente`
+	ADD COLUMN `id_tipo` INT NOT NULL,
+    
+    ADD CONSTRAINT FOREIGN KEY(`id_tipo`) REFERENCES `tipo_interacao`(`id_tipo`)
+		ON DELETE RESTRICT
+		ON UPDATE RESTRICT;
+        
+ALTER TABLE `produto`
+	ADD COLUMN `estoque_minimo_produto` INT NOT NULL,
+    CHANGE COLUMN `quantidade_produto` `estoque_produto` INT NOT NULL;
 /*
 UPDATES
 */
@@ -250,10 +314,114 @@ UPDATES
 INSERTS
 */
 
+INSERT INTO categoria (id_categoria, nome_categoria) VALUES 
+(1, 'Eletrônicos'),
+(2, 'Roupas'),
+(3, 'Alimentos'),
+(4, 'Móveis');
+
+INSERT INTO tipo_interacao (id_tipo, nome_tipo) VALUES 
+(1, 'Reclamação'),
+(2, 'Elogio'),
+(3, 'Dúvida'),
+(4, 'Sugestão');
+
+INSERT INTO endereco (id_endereco, cep_endereco, rua_endereco, logradouro_endereco, numero_endereco) VALUES 
+(1, '12345678', 'Rua A', 'Bairro Centro', 101),
+(2, '23456789', 'Rua B', 'Bairro Sul', 202),
+(3, '34567890', 'Rua C', 'Bairro Norte', 303),
+(4, '45678901', 'Rua D', 'Bairro Leste', 404);
+
+INSERT INTO cliente (id_cliente, nome_cliente, cpf_cliente, id_endereco, data_nascimento, data_cadastro_cliente, email_cliente) VALUES 
+(1, 'João Silva', '11111111111', 1, '1990-01-01', '2024-12-01', 'joao@email.com'),
+(2, 'Maria Oliveira', '22222222222', 2, '1985-05-05', '2024-12-02', 'maria@email.com'),
+(3, 'Carlos Santos', '33333333333', 3, '1995-07-15', '2024-12-03', 'carlos@email.com'),
+(4, 'Ana Costa', '44444444444', 4, '2000-03-25', '2024-12-04', 'ana@email.com');
+
+INSERT INTO compra (id_compra, id_cliente, total_compra) VALUES 
+(1, 1, 200),
+(2, 2, 450),
+(3, 3, 120),
+(4, 4, 350);
+
+INSERT INTO funcionario (id_funcionario, nome_funcionario, cpf_funcionario, salario_funcionario, data_efetivacao_funcionario, data_nascimento) VALUES 
+(1, 'Pedro Almeida', '55555555555', 3000.50, '2020-01-01', '1980-02-01'),
+(2, 'Carla Souza', '66666666666', 3500.00, '2018-03-01', '1985-06-15'),
+(3, 'Luiz Barreto', '77777777777', 4000.75, '2022-05-01', '1990-09-25'),
+(4, 'Sofia Mendes', '88888888888', 2800.00, '2019-07-01', '1995-11-10');
+
+INSERT INTO produto (id_produto, nome_produto, estoque_produto, id_categoria, id_status, estoque_minimo_produto) VALUES 
+(1, 'Notebook', 50, 1, 1, 10),
+(2, 'Camiseta', 100, 2, 1, 20),
+(3, 'Arroz', 200, 3, 1, 30),
+(4, 'Sofá', 15, 4, 1, 5);
+
+INSERT INTO preco_produto (id_preco_produto, id_produto, preco_produto, data_aplicacao) VALUES 
+(1, 1, 3500.00, '2024-12-01'),
+(2, 2, 50.00, '2024-12-01'),
+(3, 3, 20.00, '2024-12-01'),
+(4, 4, 1500.00, '2024-12-01');
+
+INSERT INTO interacao_cliente (id_funcionario, id_cliente, transcricao_interacao, data_interacao, id_tipo) VALUES 
+(1, 1, 'Cliente reclamou sobre atraso na entrega.', '2024-12-01', 1),
+(2, 2, 'Cliente elogiou o atendimento.', '2024-12-02', 2),
+(3, 3, 'Cliente perguntou sobre prazo de garantia.', '2024-12-03', 3),
+(4, 4, 'Cliente sugeriu melhoria no site.', '2024-12-04', 4);
+
+INSERT INTO item_compra (id_compra, id_preco_produto, quantidade_item, sub_total, id_produto) VALUES 
+(1, 1, 1, 3500.00, 1),
+(2, 2, 3, 150.00, 2),
+(3, 3, 10, 200.00, 3),
+(4, 4, 1, 1500.00, 4);
+
+INSERT INTO segmentacao_cliente (id_cliente, id_categoria) VALUES 
+(1, 1),
+(2, 2),
+(3, 3),
+(4, 4);
+
+INSERT INTO `status` (id_status, nome_status) VALUES 
+(1, 'Ativo'),
+(2, 'Inativo'),
+(3, 'Em Manutenção'),
+(4, 'Suspenso');
+
+INSERT INTO tarefa (id_funcionario, nome_tarefa, descricao_tarefa, data_inicio_tarefa, data_fim_tarefa, id_status) VALUES 
+(1, 'Organizar Estoque', 'Reorganizar o estoque do armazém principal.', '2024-12-01', '2024-12-03', 1),
+(2, 'Atualizar Site', 'Incluir novos produtos no site.', '2024-12-02', '2024-12-04', 1),
+(3, 'Realizar Treinamento', 'Treinar novos funcionários.', '2024-12-05', NULL, 1),
+(4, 'Manutenção de Equipamentos', 'Verificar e reparar computadores.', '2024-12-06', NULL, 2);
 
 /*
 DELETES
 */
+DELETE FROM `projeto_final`.`categoria`;
+
+DELETE FROM `projeto_final`.`cliente`;
+
+DELETE FROM `projeto_final`.`compra`;
+
+DELETE FROM `projeto_final`.`endereco`;
+
+DELETE FROM `projeto_final`.`funcionario`;
+
+DELETE FROM `projeto_final`.`historico`;
+
+DELETE FROM `projeto_final`.`interacao_cliente`;
+
+DELETE FROM `projeto_final`.`item_compra`;
+
+DELETE FROM `projeto_final`.`preco_produto`;
+
+DELETE FROM `projeto_final`.`produto`;
+
+DELETE FROM `projeto_final`.`segmentacao_cliente`;
+
+DELETE FROM `projeto_final`.`status`;
+
+DELETE FROM `projeto_final`.`tarefa`;
+
+DELETE FROM `projeto_final`.`tipo_interacao`;
 
 
 COMMIT;
