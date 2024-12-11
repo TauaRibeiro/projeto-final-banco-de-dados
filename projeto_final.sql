@@ -66,9 +66,22 @@ DELIMITER //
      SET
      `total_compra` = @total_antigo + achar_preco(NEW.`id_produto`);
      
+     UPDATE `compra`
+     SET
+     `total_compra` = @total_compra;
+     
      INSERT INTO `historico`(`tipo_acao`, `id_compra`, `id_item`, `data_registro`)
      VALUE ("ADIÇÃO DE ITEM", NEW.`id_compra`, NEW.`id_item`, NOW());
  END//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER tr_update_produto
+BEFORE UPDATE
+ON `produto` FOR EACH ROW
+BEGIN
+	-- A terminar
+END //
 DELIMITER ;
 /*
 PROCEDURES
@@ -308,7 +321,9 @@ ALTER TABLE `produto`
 /*
 UPDATES
 */
-
+UPDATE `status`
+SET
+`nome_status` = "Atribuído" WHERE (`id_status` = 3);
 
 /*
 INSERTS
@@ -380,11 +395,11 @@ INSERT INTO segmentacao_cliente (id_cliente, id_categoria) VALUES
 (3, 3),
 (4, 4);
 
-INSERT INTO `status` (id_status, nome_status) VALUES 
-(1, 'Ativo'),
-(2, 'Inativo'),
-(3, 'Em Manutenção'),
-(4, 'Suspenso');
+INSERT INTO `status` (nome_status) VALUES 
+(1, 'Ok'),
+(2, 'Restocar'),
+(3, 'Atribuído'),
+(4, 'Concluído');
 
 INSERT INTO tarefa (id_funcionario, nome_tarefa, descricao_tarefa, data_inicio_tarefa, data_fim_tarefa, id_status) VALUES 
 (1, 'Organizar Estoque', 'Reorganizar o estoque do armazém principal.', '2024-12-01', '2024-12-03', 1),
