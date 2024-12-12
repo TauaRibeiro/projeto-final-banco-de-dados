@@ -55,6 +55,7 @@ DELIMITER ;
 /*
 TRIGERS
 */
+-- Insert do item_compra
 DELIMITER //
  CREATE TRIGGER tr_insert_item_compra
  AFTER INSERT
@@ -75,6 +76,29 @@ DELIMITER //
  END//
 DELIMITER ;
 
+-- Delete do item_compra
+DELIMITER //
+CREATE TRIGGER tr_delete_item_compra
+AFTER DELETE
+ON item_compra FOR EACH ROW
+BEGIN
+    DECLARE total_atual DECIMAL(10,2);
+    
+    -- Calcula o subtotal e insere no histórico
+    SET total_atual = (SELECT total_compra FROM compra WHERE id_compra = OLD.id_compra);
+    
+    -- Atualiza o total da compra
+    UPDATE compra
+    SET total_compra = total_atual - OLD.sub_total
+    WHERE id_compra = OLD.id_compra;
+    
+    -- Registro da ação no histórico
+    INSERT INTO historico(tipo_acao, id_compra, id_item, data_registro)
+    VALUES ('REMOVER ITEM', OLD.id_compra, OLD.id_item, NOW());
+END//
+DELIMITER ;
+
+-- Update do item compra
 DELIMITER //
 CREATE TRIGGER tr_update_produto
 BEFORE UPDATE
@@ -83,9 +107,65 @@ BEGIN
 	-- A terminar
 END //
 DELIMITER ;
+
+-- Update de compra
+DELIMITER //
+CREATE TRIGGER tr_update_compra
+AFTER UPDATE
+ON compra FOR EACH ROW
+BEGIN
+    IF OLD.total_compra < NEW.total_compra THEN
+        INSERT INTO historico(tipo_acao, id_compra, id_item, data_registro)
+        VALUES ('COMPRA FINALIZADA', NEW.id_compra, NULL, NOW());
+    END IF;
+END//
+DELIMITER ;
+
+
 /*
 PROCEDURES
 */
+
+DELIMITER //
+CREATE PROCEDURE calcular_total_compra(IN id_compra INT)
+BEGIN
+    DECLARE total DECIMAL(10, 2) DEFAULT 0;
+    
+    -- Calcula o total da compra somando o sub_total dos itens
+    SELECT SUM(i.sub_total) INTO total
+    FROM item_compra AS i
+    WHERE i.id_compra = id_compra;
+    
+    -- Atualiza o total na tabela de compra
+    UPDATE compra
+    SET total_compra = total
+    WHERE compra.id_compra = id_compra;
+    
+    -- Retorna o valor total
+    SELECT total AS total_calculado;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE calcular_subtotal_item(IN id_item INT)
+BEGIN
+    DECLARE subtotal DECIMAL(10, 2);
+    
+    -- Calcula o subtotal do item
+    SELECT i.quantidade_item * achar_preco(i.id_produto) INTO subtotal
+    FROM item_compra AS i
+    JOIN preco_produto AS pp ON i.id_preco_produto = i.id_compra
+    WHERE i.id_item = id_item;
+    
+    -- Atualiza o subtotal no item_compra
+    UPDATE item_compra
+    SET item_compra.sub_total = subtotal
+    WHERE item_compra.id_item = id_item;
+    
+    -- Retorna o valor do subtotal
+    SELECT subtotal AS subtotal_calculado;
+END//
+DELIMITER ;
 
 /*
 TABLES
@@ -297,6 +377,16 @@ SELECT * FROM `projeto_final`.`tipo_interacao`;
 VIEWS
 */
 
+CREATE VIEW view_relatorio_compras AS
+SELECT c.id_compra, c.total_compra, cl.nome_cliente, cl.email_cliente
+FROM compra c
+JOIN cliente cl ON c.id_cliente = cl.id_cliente;
+
+CREATE VIEW view_itens_compra AS
+SELECT ic.id_item, ic.quantidade_item, ic.sub_total, p.nome_produto, pp.preco_produto
+FROM item_compra ic
+JOIN produto p ON ic.id_produto = p.id_produto
+JOIN preco_produto pp ON ic.id_preco_produto = pp.id_preco_produto;
 
 /*
 ALTER TABLES
