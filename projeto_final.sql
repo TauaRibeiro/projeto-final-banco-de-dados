@@ -21,7 +21,7 @@ DELIMITER;
 
 -- Achar o preco mais atualizado de um produto
 DELIMITER //
-CREATE FUNCTION achar_preco(`id_produto` INT)
+CREATE FUNCTION achar_id_preco(`id_produto` INT)
 RETURNS INT NOT DETERMINISTIC
 BEGIN
 	DECLARE `resultado` INT DEFAULT NULL;
@@ -51,29 +51,29 @@ BEGIN
 END //
 DELIMITER ;
 
-
 /*
 TRIGERS
 */
 -- Insert do item_compra
 DELIMITER //
- CREATE TRIGGER tr_insert_item_compra
- AFTER INSERT
- ON `item_compra` FOR EACH ROW
- BEGIN
-	 SET @total_antigo = (SELECT `total_compra` FROM `compra` WHERE NEW.`id_compra` = `compra`.`id_compra`); 
-     
-     UPDATE `compra`
-     SET
-     `total_compra` = @total_antigo + achar_preco(NEW.`id_produto`);
-     
-     UPDATE `compra`
-     SET
-     `total_compra` = @total_compra;
-     
-     INSERT INTO `historico`(`tipo_acao`, `id_compra`, `id_item`, `data_registro`)
-     VALUE ("ADIÇÃO DE ITEM", NEW.`id_compra`, NEW.`id_item`, NOW());
- END//
+CREATE TRIGGER tr_insert_item_compra
+AFTER INSERT
+ON item_compra FOR EACH ROW
+BEGIN
+    DECLARE total_atual DECIMAL(10,2);
+    
+
+    SET total_atual = (SELECT total_compra FROM compra WHERE id_compra = NEW.id_compra);
+    
+
+    UPDATE compra
+    SET total_compra = total_atual + NEW.sub_total
+    WHERE id_compra = NEW.id_compra;
+    
+
+    INSERT INTO historico(tipo_acao, id_compra, id_item, data_registro)
+    VALUES ('ADIÇÃO DE ITEM', NEW.id_compra, NEW.id_item, NOW());
+END//
 DELIMITER ;
 
 -- Delete do item_compra
@@ -95,29 +95,6 @@ BEGIN
     -- Registro da ação no histórico
     INSERT INTO historico(tipo_acao, id_compra, id_item, data_registro)
     VALUES ('REMOVER ITEM', OLD.id_compra, OLD.id_item, NOW());
-END//
-DELIMITER ;
-
--- Update do item compra
-DELIMITER //
-CREATE TRIGGER tr_update_produto
-BEFORE UPDATE
-ON `produto` FOR EACH ROW
-BEGIN
-	-- A terminar
-END //
-DELIMITER ;
-
--- Update de compra
-DELIMITER //
-CREATE TRIGGER tr_update_compra
-AFTER UPDATE
-ON compra FOR EACH ROW
-BEGIN
-    IF OLD.total_compra < NEW.total_compra THEN
-        INSERT INTO historico(tipo_acao, id_compra, id_item, data_registro)
-        VALUES ('COMPRA FINALIZADA', NEW.id_compra, NULL, NOW());
-    END IF;
 END//
 DELIMITER ;
 
@@ -147,25 +124,26 @@ END//
 DELIMITER ;
 
 DELIMITER //
-CREATE PROCEDURE calcular_subtotal_item(IN id_item INT)
+CREATE PROCEDURE calcular_subtotal_item(IN p_id_item INT)
 BEGIN
-    DECLARE subtotal DECIMAL(10, 2);
+    DECLARE v_subtotal DECIMAL(10, 2);
     
     -- Calcula o subtotal do item
-    SELECT i.quantidade_item * achar_preco(i.id_produto) INTO subtotal
-    FROM item_compra AS i
-    JOIN preco_produto AS pp ON i.id_preco_produto = i.id_compra
-    WHERE i.id_item = id_item;
+    SELECT i.quantidade_item * pp.preco_produto INTO v_subtotal
+    FROM item_compra i
+    JOIN preco_produto pp ON i.id_preco_produto = pp.id_preco_produto
+    WHERE i.id_item = p_id_item;
     
     -- Atualiza o subtotal no item_compra
     UPDATE item_compra
-    SET item_compra.sub_total = subtotal
-    WHERE item_compra.id_item = id_item;
+    SET sub_total = v_subtotal
+    WHERE id_item = p_id_item;
     
     -- Retorna o valor do subtotal
-    SELECT subtotal AS subtotal_calculado;
+    SELECT v_subtotal AS subtotal_calculado;
 END//
 DELIMITER ;
+
 
 /*
 TABLES
@@ -332,13 +310,7 @@ CREATE TABLE `historico` (
     `id_item` INT,
     `data_registro` DATETIME NOT NULL,
     
-    PRIMARY KEY(`id_historico`),
-    CONSTRAINT `fk_compra_historico` FOREIGN KEY(`id_compra`) REFERENCES `compra`(`id_compra`)
-		ON DELETE RESTRICT
-        ON UPDATE RESTRICT,
-	CONSTRAINT `fk_item_historico` FOREIGN KEY(`id_item`) REFERENCES `item_compra`(`id_item`)
-		ON DELETE RESTRICT
-        ON UPDATE RESTRICT
+    PRIMARY KEY(`id_historico`)
 );
 
 /*
@@ -372,6 +344,8 @@ SELECT * FROM `projeto_final`.`tarefa`;
 
 SELECT * FROM `projeto_final`.`tipo_interacao`;
 
+SELECT * FROM view_itens_compra;
+SELECT * FROM view_relatorio_compras;
 
 /*
 VIEWS
@@ -391,6 +365,11 @@ JOIN preco_produto pp ON ic.id_preco_produto = pp.id_preco_produto;
 /*
 ALTER TABLES
 */
+
+ALTER TABLE `historico`  
+	DROP FOREIGN KEY `fk_item_historico`,
+	ADD CONSTRAINT `fk_item_historico` FOREIGN KEY (`id_item`) REFERENCES `item_compra` (`id_item`) 
+	ON DELETE CASCADE;
 
 ALTER TABLE `item_compra`
 	ADD COLUMN `id_produto` INT NOT NULL,
@@ -485,7 +464,7 @@ INSERT INTO segmentacao_cliente (id_cliente, id_categoria) VALUES
 (3, 3),
 (4, 4);
 
-INSERT INTO `status` (nome_status) VALUES 
+INSERT INTO `status` (id_status, nome_status) VALUES 
 (1, 'Ok'),
 (2, 'Restocar'),
 (3, 'Atribuído'),
@@ -530,3 +509,21 @@ DELETE FROM `projeto_final`.`tipo_interacao`;
 
 
 COMMIT;
+/*
+	drops
+*/
+
+DROP TRIGGER tr_insert_item_compra;
+DROP TABLE `historico`;
+
+/*
+	TESTES
+*/
+
+INSERT INTO `item_compra`(`id_compra`, `id_preco_produto`, `quantidade_item`, `sub_total`, `id_produto`)
+VALUES
+(4, 2, 20, calcular_subTotal(2, 20), 2);
+
+DELETE FROM `item_compra` WHERE `id_item` = 29;
+
+CALL calcular_total_compra(4);
